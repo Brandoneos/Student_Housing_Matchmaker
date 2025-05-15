@@ -1,0 +1,68 @@
+import math
+from math import radians, cos, sin, asin, sqrt
+def count_nearby_colleges(lat1, long1, colleges_df, miles=2):
+    distances = colleges_df.apply(
+        lambda row: haversine(lat1, long1, row['Latitude'], row['Longitude']),
+        axis=1
+    )
+    return sum(distances <= miles)
+def haversine(lat1, lon1, lat2, lon2):
+    R = 3958.8  # Earth radius in miles
+    lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = math.sin(dlat/2)**2 + math.cos(lat1)*math.cos(lat2)*math.sin(dlon/2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
+    
+geocoded_colleges_df = pd.read_csv('chicago_colleges_geoceded.csv')
+rentals_df = chicago_rentals_df.copy()
+rentals_df['number'] = rentals_df.apply(
+    lambda row: count_nearby_colleges(
+        row['Latitude'], 
+        row['Longitude'], 
+        geocoded_colleges_df
+    ), 
+    axis=1
+)
+# rentals_df, includes rental properties and number of colleges within 2 mile radius of it next to each rental property.
+
+# ['Beds', 'Baths', 'Latitude', 'Longitude']
+
+
+features = ['number'] #number of colleges within 2 mile radius
+target = 'Price'
+
+X = rentals_df[features]
+y = rentals_df[target]
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Model 1 : Baseline Model
+mean_price = y_train.mean()
+baseline_preds = [mean_price] * len(y_test)
+
+
+# Model 2: Linear Regression
+lr = LinearRegression()
+lr.fit(X_train, y_train)
+lr_preds = lr.predict(X_test)
+
+# Model 3: Random Forest
+rf = RandomForestRegressor(random_state=42)
+rf.fit(X_train, y_train)
+rf_preds = rf.predict(X_test)
+
+def evaluate_model(name, true, pred):
+    rmse = np.sqrt(mean_squared_error(true, pred))
+    mae = mean_absolute_error(true, pred)
+    print(f"{name} → RMSE: ${rmse:.2f}, MAE: ${mae:.2f}")
+
+print("=== Model Performance on Rent Prediction ===")
+evaluate_model("Baseline (Mean)", y_test, baseline_preds)
+evaluate_model("Linear Regression", y_test, lr_preds)
+evaluate_model("Random Forest", y_test, rf_preds)
+
+ax = sns.scatterplot(x='number', y='Price', data=rentals_df)
+# ax.set_xticks([])
+# ax.set_xlabel("Universities")
